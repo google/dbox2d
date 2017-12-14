@@ -1,5 +1,7 @@
 ###A Dart 2D physics engine
 
+[![Join the chat at https://gitter.im/google/box2d.dart](https://badges.gitter.im/google/box2d.dart.svg)](https://gitter.im/google/box2d.dart?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 [![Build Status](https://travis-ci.org/google/box2d.dart.svg?branch=master)](https://travis-ci.org/google/box2d.dart)
 [![Coverage Status](https://coveralls.io/repos/google/box2d.dart/badge.svg?branch=master)](https://coveralls.io/r/google/box2d.dart)
 

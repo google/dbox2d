@@ -1,34 +1,8 @@
-/*******************************************************************************
- * Copyright (c) 2015, Daniel Murphy, Google
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *  * Redistributions of source code must retain the above copyright notice,
- *    this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
- * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- ******************************************************************************/
 part of box2d;
 
-/**
- * The class manages contact between two shapes. A contact exists for each overlapping AABB in the
- * broad-phase (except if filtered). Therefore a contact object may exist that has no contact
- * points.
- *
- */
+/// The class manages contact between two shapes. A contact exists for each overlapping AABB in the
+/// broad-phase (except if filtered). Therefore a contact object may exist that has no contact
+/// points.
 abstract class Contact {
   // Flags stored in _flags
   // Used when crawling contact graph when forming islands.
@@ -51,8 +25,8 @@ abstract class Contact {
   Contact _next;
 
   // Nodes for connecting bodies.
-  ContactEdge _nodeA = new ContactEdge();
-  ContactEdge _nodeB = new ContactEdge();
+  ContactEdge _nodeA = ContactEdge();
+  ContactEdge _nodeB = ContactEdge();
 
   Fixture _fixtureA;
   Fixture _fixtureB;
@@ -60,7 +34,7 @@ abstract class Contact {
   int _indexA = 0;
   int _indexB = 0;
 
-  final Manifold _manifold = new Manifold();
+  final Manifold _manifold = Manifold();
 
   int _toiCount = 0;
   double _toi = 0.0;
@@ -70,12 +44,7 @@ abstract class Contact {
 
   double _tangentSpeed = 0.0;
 
-  final IWorldPool _pool;
-
-  Contact(this._pool);
-
-  /** initialization for pooling */
-  void init(Fixture fA, int indexA, Fixture fB, int indexB) {
+  Contact(Fixture fA, int indexA, Fixture fB, int indexB) {
     _flags = ENABLED_FLAG;
 
     _fixtureA = fA;
@@ -106,9 +75,38 @@ abstract class Contact {
     _tangentSpeed = 0.0;
   }
 
-  /**
-   * Get the world manifold.
-   */
+  static Contact init(Fixture fA, int indexA, Fixture fB, int indexB) {
+    // Remember that we use the order in the enum here to determine in which
+    // order the arguments should come in the different contact classes.
+    // { CIRCLE, EDGE, POLYGON, CHAIN }
+    ShapeType typeA =
+        fA.getType().index < fB.getType().index ? fA.getType() : fB.getType();
+    ShapeType typeB = fA.getType() == typeA ? fB.getType() : fA.getType();
+    Fixture temp = fA;
+    fA = fA.getType() == typeA ? fA : fB;
+    fB = fB.getType() == typeB ? fB : temp;
+
+    if (typeA == ShapeType.CIRCLE && typeB == ShapeType.CIRCLE) {
+      return CircleContact(fA, fB);
+    } else if (typeA == ShapeType.POLYGON && typeB == ShapeType.POLYGON) {
+      return PolygonContact(fA, fB);
+    } else if (typeA == ShapeType.CIRCLE && typeB == ShapeType.POLYGON) {
+      return PolygonAndCircleContact(fB, fA);
+    } else if (typeA == ShapeType.CIRCLE && typeB == ShapeType.EDGE) {
+      return EdgeAndCircleContact(fB, indexB, fA, indexA);
+    } else if (typeA == ShapeType.CIRCLE && typeB == ShapeType.POLYGON) {
+      return EdgeAndPolygonContact(fA, indexA, fB, indexB);
+    } else if (typeA == ShapeType.CIRCLE && typeB == ShapeType.CHAIN) {
+      return ChainAndCircleContact(fB, indexB, fA, indexA);
+    } else if (typeA == ShapeType.POLYGON && typeB == ShapeType.CHAIN) {
+      return ChainAndPolygonContact(fB, indexB, fA, indexA);
+    } else {
+      assert(false, "Not compatible contact type");
+      return CircleContact(fA, fB);
+    }
+  }
+
+  /// Get the world manifold.
   void getWorldManifold(WorldManifold worldManifold) {
     final Body bodyA = _fixtureA.getBody();
     final Body bodyB = _fixtureB.getBody();
@@ -119,21 +117,13 @@ abstract class Contact {
         bodyB._transform, shapeB.radius);
   }
 
-  /**
-   * Is this contact touching
-   *
-   * @return
-   */
+  /// Is this contact touching
   bool isTouching() {
     return (_flags & TOUCHING_FLAG) == TOUCHING_FLAG;
   }
 
-  /**
-   * Enable/disable this contact. This can be used inside the pre-solve contact listener. The
-   * contact is only disabled for the current time step (or sub-step in continuous collisions).
-   *
-   * @param flag
-   */
+  /// Enable/disable this contact. This can be used inside the pre-solve contact listener. The
+  /// contact is only disabled for the current time step (or sub-step in continuous collisions).
   void setEnabled(bool flag) {
     if (flag) {
       _flags |= ENABLED_FLAG;
@@ -142,40 +132,24 @@ abstract class Contact {
     }
   }
 
-  /**
-   * Has this contact been disabled?
-   *
-   * @return
-   */
+  /// Has this contact been disabled?
   bool isEnabled() {
     return (_flags & ENABLED_FLAG) == ENABLED_FLAG;
   }
 
-  /**
-   * Get the next contact in the world's contact list.
-   *
-   * @return
-   */
+  /// Get the next contact in the world's contact list.
   Contact getNext() {
     return _next;
   }
 
-  /**
-   * Get the first fixture in this contact.
-   *
-   * @return
-   */
+  /// Get the first fixture in this contact.
   Fixture get fixtureA => _fixtureA;
 
   int getChildIndexA() {
     return _indexA;
   }
 
-  /**
-   * Get the second fixture in this contact.
-   *
-   * @return
-   */
+  /// Get the second fixture in this contact.
   Fixture get fixtureB => _fixtureB;
 
   int getChildIndexB() {
@@ -193,15 +167,13 @@ abstract class Contact {
 
   void evaluate(Manifold manifold, Transform xfA, Transform xfB);
 
-  /**
-   * Flag this contact for filtering. Filtering will occur the next time step.
-   */
+  /// Flag this contact for filtering. Filtering will occur the next time step.
   void flagForFiltering() {
     _flags |= FILTER_FLAG;
   }
 
   // djm pooling
-  final Manifold _oldManifold = new Manifold();
+  final Manifold _oldManifold = Manifold();
 
   void update(ContactListener listener) {
     _oldManifold.set(_manifold);
@@ -220,14 +192,11 @@ abstract class Contact {
     Body bodyB = _fixtureB.getBody();
     Transform xfA = bodyA._transform;
     Transform xfB = bodyB._transform;
-    // log.debug("TransformA: "+xfA);
-    // log.debug("TransformB: "+xfB);
 
     if (sensor) {
       Shape shapeA = _fixtureA.getShape();
       Shape shapeB = _fixtureB.getShape();
-      touching = _pool
-          .getCollision()
+      touching = World.collision
           .testOverlap(shapeA, _indexA, shapeB, _indexB, xfA, xfB);
 
       // Sensors don't generate manifolds.
@@ -284,26 +253,14 @@ abstract class Contact {
     }
   }
 
-  /**
-   * Friction mixing law. The idea is to allow either fixture to drive the restitution to zero. For
-   * example, anything slides on ice.
-   *
-   * @param friction1
-   * @param friction2
-   * @return
-   */
+  /// Friction mixing law. The idea is to allow either fixture to drive the restitution to zero. For
+  /// example, anything slides on ice.
   static double mixFriction(double friction1, double friction2) {
     return Math.sqrt(friction1 * friction2);
   }
 
-  /**
-   * Restitution mixing law. The idea is allow for anything to bounce off an inelastic surface. For
-   * example, a superball bounces on anything.
-   *
-   * @param restitution1
-   * @param restitution2
-   * @return
-   */
+  /// Restitution mixing law. The idea is allow for anything to bounce off an inelastic surface. For
+  /// example, a superball bounces on anything.
   static double mixRestitution(double restitution1, double restitution2) {
     return restitution1 > restitution2 ? restitution1 : restitution2;
   }

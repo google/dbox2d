@@ -1,27 +1,3 @@
-/*******************************************************************************
- * Copyright (c) 2015, Daniel Murphy, Google
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *  * Redistributions of source code must retain the above copyright notice,
- *    this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
- * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- ******************************************************************************/
-
 part of box2d;
 
 //Linear constraint (point-to-line)
@@ -40,24 +16,20 @@ part of box2d;
 //Cdot = wB - wA
 //J = [0 0 -1 0 0 1]
 
-/**
- * A wheel joint. This joint provides two degrees of freedom: translation along an axis fixed in
- * bodyA and rotation in the plane. You can use a joint limit to restrict the range of motion and a
- * joint motor to drive the rotation or to model rotational friction. This joint is designed for
- * vehicle suspensions.
- *
- * @author Daniel Murphy
- */
+/// A wheel joint. This joint provides two degrees of freedom: translation along an axis fixed in
+/// bodyA and rotation in the plane. You can use a joint limit to restrict the range of motion and a
+/// joint motor to drive the rotation or to model rotational friction. This joint is designed for
+/// vehicle suspensions.
 class WheelJoint extends Joint {
   // TODO(srdjan): make fields private.
   double _frequencyHz = 0.0;
   double _dampingRatio = 0.0;
 
   // Solver shared
-  final Vector2 _localAnchorA = new Vector2.zero();
-  final Vector2 _localAnchorB = new Vector2.zero();
-  final Vector2 _localXAxisA = new Vector2.zero();
-  final Vector2 _localYAxisA = new Vector2.zero();
+  final Vector2 localAnchorA = Vector2.zero();
+  final Vector2 localAnchorB = Vector2.zero();
+  final Vector2 _localXAxisA = Vector2.zero();
+  final Vector2 _localYAxisA = Vector2.zero();
 
   double _impulse = 0.0;
   double _motorImpulse = 0.0;
@@ -70,15 +42,15 @@ class WheelJoint extends Joint {
   // Solver temp
   int _indexA = 0;
   int _indexB = 0;
-  final Vector2 _localCenterA = new Vector2.zero();
-  final Vector2 _localCenterB = new Vector2.zero();
+  final Vector2 _localCenterA = Vector2.zero();
+  final Vector2 _localCenterB = Vector2.zero();
   double _invMassA = 0.0;
   double _invMassB = 0.0;
   double _invIA = 0.0;
   double _invIB = 0.0;
 
-  final Vector2 _ax = new Vector2.zero();
-  final Vector2 _ay = new Vector2.zero();
+  final Vector2 _ax = Vector2.zero();
+  final Vector2 _ay = Vector2.zero();
   double _sAx = 0.0, _sBx = 0.0;
   double _sAy = 0.0, _sBy = 0.0;
 
@@ -89,9 +61,9 @@ class WheelJoint extends Joint {
   double _bias = 0.0;
   double _gamma = 0.0;
 
-  WheelJoint(IWorldPool argPool, WheelJointDef def) : super(argPool, def) {
-    _localAnchorA.setFrom(def.localAnchorA);
-    _localAnchorB.setFrom(def.localAnchorB);
+  WheelJoint(WheelJointDef def) : super(def) {
+    localAnchorA.setFrom(def.localAnchorA);
+    localAnchorB.setFrom(def.localAnchorB);
     _localXAxisA.setFrom(def.localAxisA);
     _localXAxisA.scaleOrthogonalInto(1.0, _localYAxisA);
 
@@ -106,33 +78,17 @@ class WheelJoint extends Joint {
     _dampingRatio = def.dampingRatio;
   }
 
-  Vector2 getLocalAnchorA() {
-    return _localAnchorA;
-  }
-
-  Vector2 getLocalAnchorB() {
-    return _localAnchorB;
-  }
-
-  void getAnchorA(Vector2 argOut) {
-    _bodyA.getWorldPointToOut(_localAnchorA, argOut);
-  }
-
-  void getAnchorB(Vector2 argOut) {
-    _bodyB.getWorldPointToOut(_localAnchorB, argOut);
-  }
-
-  void getReactionForce(double inv_dt, Vector2 argOut) {
-    final Vector2 temp = pool.popVec2();
+  Vector2 getReactionForce(double inv_dt) {
+    final Vector2 temp = Vector2.zero();
     temp
       ..setFrom(_ay)
       ..scale(_impulse);
-    argOut
+    final Vector2 result = Vector2.copy(_ax)
       ..setFrom(_ax)
       ..scale(_springImpulse)
       ..add(temp)
       ..scale(inv_dt);
-    pool.pushVec2(1);
+    return result;
   }
 
   double getReactionTorque(double inv_dt) {
@@ -143,20 +99,19 @@ class WheelJoint extends Joint {
     Body b1 = _bodyA;
     Body b2 = _bodyB;
 
-    Vector2 p1 = pool.popVec2();
-    Vector2 p2 = pool.popVec2();
-    Vector2 axis = pool.popVec2();
-    b1.getWorldPointToOut(_localAnchorA, p1);
-    b2.getWorldPointToOut(_localAnchorA, p2);
+    Vector2 p1 = Vector2.zero();
+    Vector2 p2 = Vector2.zero();
+    Vector2 axis = Vector2.zero();
+    p1.setFrom(b1.getWorldPoint(localAnchorA));
+    p2.setFrom(b2.getWorldPoint(localAnchorA));
     p2.sub(p1);
-    b1.getWorldVectorToOut(_localXAxisA, axis);
+    axis.setFrom(b1.getWorldVector(_localXAxisA));
 
     double translation = p2.dot(axis);
-    pool.pushVec2(3);
     return translation;
   }
 
-  /** For serialization */
+  /// For serialization
   Vector2 getLocalAxisA() {
     return _localXAxisA;
   }
@@ -201,9 +156,9 @@ class WheelJoint extends Joint {
 
   // pooling
   // TODO(srdjan): Make fields private.
-  final Vector2 rA = new Vector2.zero();
-  final Vector2 rB = new Vector2.zero();
-  final Vector2 d = new Vector2.zero();
+  final Vector2 rA = Vector2.zero();
+  final Vector2 rB = Vector2.zero();
+  final Vector2 d = Vector2.zero();
 
   void initVelocityConstraints(SolverData data) {
     _indexA = _bodyA._islandIndex;
@@ -228,26 +183,23 @@ class WheelJoint extends Joint {
     Vector2 vB = data.velocities[_indexB].v;
     double wB = data.velocities[_indexB].w;
 
-    final Rot qA = pool.popRot();
-    final Rot qB = pool.popRot();
-    final Vector2 temp = pool.popVec2();
+    final Rot qA = Rot();
+    final Rot qB = Rot();
+    final Vector2 temp = Vector2.zero();
 
     qA.setAngle(aA);
     qB.setAngle(aB);
 
     // Compute the effective masses.
-    Rot.mulToOutUnsafe(
-        qA,
-        temp
-          ..setFrom(_localAnchorA)
-          ..sub(_localCenterA),
-        rA);
-    Rot.mulToOutUnsafe(
-        qB,
-        temp
-          ..setFrom(_localAnchorB)
-          ..sub(_localCenterB),
-        rB);
+    temp
+      ..setFrom(localAnchorA)
+      ..sub(_localCenterA);
+    rA.setFrom(Rot.mulVec2(qA, temp));
+    temp
+      ..setFrom(localAnchorB)
+      ..sub(_localCenterB);
+    rB.setFrom(Rot.mulVec2(qB, temp));
+
     d
       ..setFrom(cB)
       ..add(rB)
@@ -256,7 +208,7 @@ class WheelJoint extends Joint {
 
     // Point to line constraint
     {
-      Rot.mulToOut(qA, _localYAxisA, _ay);
+      _ay.setFrom(Rot.mulVec2(qA, _localYAxisA));
       _sAy = (temp
             ..setFrom(d)
             ..add(rA))
@@ -275,7 +227,7 @@ class WheelJoint extends Joint {
     _bias = 0.0;
     _gamma = 0.0;
     if (_frequencyHz > 0.0) {
-      Rot.mulToOut(qA, _localXAxisA, _ax);
+      _ax.setFrom(Rot.mulVec2(qA, _localXAxisA));
       _sAx = (temp
             ..setFrom(d)
             ..add(rA))
@@ -290,7 +242,7 @@ class WheelJoint extends Joint {
         double C = d.dot(_ax);
 
         // Frequency
-        double omega = 2.0 * Math.PI * _frequencyHz;
+        double omega = 2.0 * Math.pi * _frequencyHz;
 
         // Damping coefficient
         double dd = 2.0 * _springMass * _dampingRatio * omega;
@@ -328,7 +280,7 @@ class WheelJoint extends Joint {
     }
 
     if (data.step.warmStarting) {
-      final Vector2 P = pool.popVec2();
+      final Vector2 P = Vector2.zero();
       // Account for variable time step.
       _impulse *= data.step.dtRatio;
       _springImpulse *= data.step.dtRatio;
@@ -346,18 +298,13 @@ class WheelJoint extends Joint {
       vB.x += _invMassB * P.x;
       vB.y += _invMassB * P.y;
       wB += _invIB * LB;
-      pool.pushVec2(1);
     } else {
       _impulse = 0.0;
       _springImpulse = 0.0;
       _motorImpulse = 0.0;
     }
-    pool.pushRot(2);
-    pool.pushVec2(1);
 
-    // data.velocities[_indexA].v = vA;
     data.velocities[_indexA].w = wA;
-    // data.velocities[_indexB].v = vB;
     data.velocities[_indexB].w = wB;
   }
 
@@ -370,8 +317,8 @@ class WheelJoint extends Joint {
     Vector2 vB = data.velocities[_indexB].v;
     double wB = data.velocities[_indexB].w;
 
-    final Vector2 temp = pool.popVec2();
-    final Vector2 P = pool.popVec2();
+    final Vector2 temp = Vector2.zero();
+    final Vector2 P = Vector2.zero();
 
     // Solve spring constraint
     {
@@ -435,7 +382,6 @@ class WheelJoint extends Joint {
       vB.y += mB * P.y;
       wB += iB * LB;
     }
-    pool.pushVec2(2);
 
     // data.velocities[_indexA].v = vA;
     data.velocities[_indexA].w = wA;
@@ -449,33 +395,30 @@ class WheelJoint extends Joint {
     Vector2 cB = data.positions[_indexB].c;
     double aB = data.positions[_indexB].a;
 
-    final Rot qA = pool.popRot();
-    final Rot qB = pool.popRot();
-    final Vector2 temp = pool.popVec2();
+    final Rot qA = Rot();
+    final Rot qB = Rot();
+    final Vector2 temp = Vector2.zero();
 
     qA.setAngle(aA);
     qB.setAngle(aB);
 
-    Rot.mulToOut(
-        qA,
-        temp
-          ..setFrom(_localAnchorA)
-          ..sub(_localCenterA),
-        rA);
-    Rot.mulToOut(
-        qB,
-        temp
-          ..setFrom(_localAnchorB)
-          ..sub(_localCenterB),
-        rB);
+    temp
+      ..setFrom(localAnchorA)
+      ..sub(_localCenterA);
+    rA.setFrom(Rot.mulVec2(qA, temp));
+    temp
+      ..setFrom(localAnchorB)
+      ..sub(_localCenterB);
+    rB.setFrom(Rot.mulVec2(qB, temp));
+
     d
       ..setFrom(cB)
       ..sub(cA)
       ..add(rB)
       ..sub(rA);
 
-    Vector2 ay = pool.popVec2();
-    Rot.mulToOut(qA, _localYAxisA, ay);
+    Vector2 ay = Vector2.zero();
+    ay.setFrom(Rot.mulVec2(qA, _localYAxisA));
 
     double sAy = (temp
           ..setFrom(d)
@@ -495,7 +438,7 @@ class WheelJoint extends Joint {
       impulse = 0.0;
     }
 
-    final Vector2 P = pool.popVec2();
+    final Vector2 P = Vector2.zero();
     P.x = impulse * ay.x;
     P.y = impulse * ay.y;
     double LA = impulse * sAy;
@@ -508,11 +451,7 @@ class WheelJoint extends Joint {
     cB.y += _invMassB * P.y;
     aB += _invIB * LB;
 
-    pool.pushVec2(3);
-    pool.pushRot(2);
-    // data.positions[_indexA].c = cA;
     data.positions[_indexA].a = aA;
-    // data.positions[_indexB].c = cB;
     data.positions[_indexB].a = aB;
 
     return C.abs() <= Settings.linearSlop;

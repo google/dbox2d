@@ -1,44 +1,18 @@
-/*******************************************************************************
- * Copyright (c) 2015, Daniel Murphy, Google
- * All rights reserved.
- * 
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *  * Redistributions of source code must retain the above copyright notice,
- *    this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
- * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- ******************************************************************************/
-
 part of box2d;
 
-/***
- * A chain shape is a free form sequence of line segments. The chain has two-sided collision, so you
- * can use inside and outside collision. Therefore, you may use any winding order. Connectivity
- * information is used to create smooth collisions. WARNING: The chain will not collide properly if
- * there are self-intersections.
- */
-
+/// A chain shape is a free form sequence of line segments. The chain has two-sided collision, so you
+/// can use inside and outside collision. Therefore, you may use any winding order. Connectivity
+/// information is used to create smooth collisions. WARNING: The chain will not collide properly if
+/// there are self-intersections.
 class ChainShape extends Shape {
   List<Vector2> _vertices;
   int _count = 0;
-  final Vector2 _prevVertex = new Vector2.zero(),
-      _nextVertex = new Vector2.zero();
-  bool _hasPrevVertex = false, _hasNextVertex = false;
+  final Vector2 _prevVertex = Vector2.zero();
+  final Vector2 _nextVertex = Vector2.zero();
+  bool _hasPrevVertex = false;
+  bool _hasNextVertex = false;
 
-  final EdgeShape _pool0 = new EdgeShape();
+  final EdgeShape _pool0 = EdgeShape();
 
   ChainShape() : super(ShapeType.CHAIN) {
     radius = Settings.polygonRadius;
@@ -53,9 +27,7 @@ class ChainShape extends Shape {
     return _count - 1;
   }
 
-  /**
-   * Get a child edge.
-   */
+  /// Get a child edge.
   void getChildEdge(EdgeShape edge, int index) {
     assert(0 <= index && index < _count - 1);
     edge.radius = radius;
@@ -155,7 +127,7 @@ class ChainShape extends Shape {
   }
 
   Shape clone() {
-    ChainShape clone = new ChainShape();
+    ChainShape clone = ChainShape();
     clone.createChain(_vertices, _count);
     clone._prevVertex.setFrom(_prevVertex);
     clone._nextVertex.setFrom(_nextVertex);
@@ -164,17 +136,28 @@ class ChainShape extends Shape {
     return clone;
   }
 
-  /**
-   * Create a loop. This automatically adjusts connectivity.
-   * 
-   * @param vertices an array of vertices, these are copied
-   * @param count the vertex count
-   */
+  /// Returns the vertex at the given position (index).
+  ///
+  /// @param index the index of the vertex 0 <= index < getVertexCount( )
+  /// @param vertex output vertex object, must be initialized
+  Vector2 getVertex(int index) {
+    assert(index >= 0 && index < _vertices.length);
+    return _vertices[index].clone();
+  }
+
+  int getVertexCount() {
+    return _vertices.length;
+  }
+
+  /// Create a loop. This automatically adjusts connectivity.
+  ///
+  /// @param vertices an array of vertices, these are copied
+  /// @param count the vertex count
   void createLoop(final List<Vector2> vertices, int count) {
     assert(_vertices == null && _count == 0);
     assert(count >= 3);
     _count = count + 1;
-    _vertices = new List<Vector2>(_count);
+    _vertices = List<Vector2>(_count);
     for (int i = 1; i < count; i++) {
       Vector2 v1 = vertices[i - 1];
       Vector2 v2 = vertices[i];
@@ -185,26 +168,24 @@ class ChainShape extends Shape {
       }
     }
     for (int i = 0; i < count; i++) {
-      _vertices[i] = new Vector2.copy(vertices[i]);
+      _vertices[i] = Vector2.copy(vertices[i]);
     }
-    _vertices[count] = new Vector2.copy(_vertices[0]);
+    _vertices[count] = Vector2.copy(_vertices[0]);
     _prevVertex.setFrom(_vertices[_count - 2]);
     _nextVertex.setFrom(_vertices[1]);
     _hasPrevVertex = true;
     _hasNextVertex = true;
   }
 
-  /**
-   * Create a chain with isolated end vertices.
-   * 
-   * @param vertices an array of vertices, these are copied
-   * @param count the vertex count
-   */
+  /// Create a chain with isolated end vertices.
+  ///
+  /// @param vertices an array of vertices, these are copied
+  /// @param count the vertex count
   void createChain(final List<Vector2> vertices, int count) {
     assert(_vertices == null && _count == 0);
     assert(count >= 2);
     _count = count;
-    _vertices = new List<Vector2>(_count);
+    _vertices = List<Vector2>(_count);
     for (int i = 1; i < _count; i++) {
       Vector2 v1 = vertices[i - 1];
       Vector2 v2 = vertices[i];
@@ -215,7 +196,7 @@ class ChainShape extends Shape {
       }
     }
     for (int i = 0; i < _count; i++) {
-      _vertices[i] = new Vector2.copy(vertices[i]);
+      _vertices[i] = Vector2.copy(vertices[i]);
     }
     _hasPrevVertex = false;
     _hasNextVertex = false;
@@ -224,21 +205,13 @@ class ChainShape extends Shape {
     _nextVertex.setZero();
   }
 
-  /**
-   * Establish connectivity to a vertex that precedes the first vertex. Don't call this for loops.
-   * 
-   * @param prevVertex
-   */
+  /// Establish connectivity to a vertex that precedes the first vertex. Don't call this for loops.
   void setPrevVertex(final Vector2 prevVertex) {
     _prevVertex.setFrom(prevVertex);
     _hasPrevVertex = true;
   }
 
-  /**
-   * Establish connectivity to a vertex that follows the last vertex. Don't call this for loops.
-   * 
-   * @param nextVertex
-   */
+  /// Establish connectivity to a vertex that follows the last vertex. Don't call this for loops.
   void setNextVertex(final Vector2 nextVertex) {
     _nextVertex.setFrom(nextVertex);
     _hasNextVertex = true;

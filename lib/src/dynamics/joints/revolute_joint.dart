@@ -1,27 +1,3 @@
-/*******************************************************************************
- * Copyright (c) 2015, Daniel Murphy, Google
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *  * Redistributions of source code must retain the above copyright notice,
- *    this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
- * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- ******************************************************************************/
-
 part of box2d;
 //Point-to-point constraint
 //C = p2 - p1
@@ -36,20 +12,16 @@ part of box2d;
 //J = [0 0 -1 0 0 1]
 //K = invI1 + invI2
 
-/**
- * A revolute joint constrains two bodies to share a common point while they are free to rotate
- * about the point. The relative rotation about the shared point is the joint angle. You can limit
- * the relative rotation with a joint limit that specifies a lower and upper angle. You can use a
- * motor to drive the relative rotation about the shared point. A maximum motor torque is provided
- * so that infinite forces are not generated.
- *
- * @author Daniel Murphy
- */
+/// A revolute joint constrains two bodies to share a common point while they are free to rotate
+/// about the point. The relative rotation about the shared point is the joint angle. You can limit
+/// the relative rotation with a joint limit that specifies a lower and upper angle. You can use a
+/// motor to drive the relative rotation about the shared point. A maximum motor torque is provided
+/// so that infinite forces are not generated.
 class RevoluteJoint extends Joint {
   // Solver shared
-  final Vector2 _localAnchorA = new Vector2.zero();
-  final Vector2 _localAnchorB = new Vector2.zero();
-  final Vector3 _impulse = new Vector3.zero();
+  final Vector2 localAnchorA = Vector2.zero();
+  final Vector2 localAnchorB = Vector2.zero();
+  final Vector3 _impulse = Vector3.zero();
   double _motorImpulse = 0.0;
 
   bool _enableMotor = false;
@@ -64,23 +36,22 @@ class RevoluteJoint extends Joint {
   // Solver temp
   int _indexA = 0;
   int _indexB = 0;
-  final Vector2 _rA = new Vector2.zero();
-  final Vector2 _rB = new Vector2.zero();
-  final Vector2 _localCenterA = new Vector2.zero();
-  final Vector2 _localCenterB = new Vector2.zero();
+  final Vector2 _rA = Vector2.zero();
+  final Vector2 _rB = Vector2.zero();
+  final Vector2 _localCenterA = Vector2.zero();
+  final Vector2 _localCenterB = Vector2.zero();
   double _invMassA = 0.0;
   double _invMassB = 0.0;
   double _invIA = 0.0;
   double _invIB = 0.0;
   final Matrix3 _mass =
-      new Matrix3.zero(); // effective mass for point-to-point constraint.
+      Matrix3.zero(); // effective mass for point-to-point constraint.
   double _motorMass = 0.0; // effective mass for motor/limit angular constraint.
   LimitState _limitState = LimitState.INACTIVE;
 
-  RevoluteJoint(IWorldPool argWorld, RevoluteJointDef def)
-      : super(argWorld, def) {
-    _localAnchorA.setFrom(def.localAnchorA);
-    _localAnchorB.setFrom(def.localAnchorB);
+  RevoluteJoint(RevoluteJointDef def) : super(def) {
+    localAnchorA.setFrom(def.localAnchorA);
+    localAnchorB.setFrom(def.localAnchorB);
     _referenceAngle = def.referenceAngle;
 
     _lowerAngle = def.lowerAngle;
@@ -110,35 +81,22 @@ class RevoluteJoint extends Joint {
     double aB = data.positions[_indexB].a;
     Vector2 vB = data.velocities[_indexB].v;
     double wB = data.velocities[_indexB].w;
-    final Rot qA = pool.popRot();
-    final Rot qB = pool.popRot();
-    final Vector2 temp = pool.popVec2();
+    final Rot qA = Rot();
+    final Rot qB = Rot();
+    final Vector2 temp = Vector2.zero();
 
     qA.setAngle(aA);
     qB.setAngle(aB);
 
     // Compute the effective masses.
-    Rot.mulToOutUnsafe(
-        qA,
-        temp
-          ..setFrom(_localAnchorA)
-          ..sub(_localCenterA),
-        _rA);
-    Rot.mulToOutUnsafe(
-        qB,
-        temp
-          ..setFrom(_localAnchorB)
-          ..sub(_localCenterB),
-        _rB);
-
-    // J = [-I -r1_skew I r2_skew]
-    // [ 0 -1 0 1]
-    // r_skew = [-ry; rx]
-
-    // Matlab
-    // K = [ mA+r1y^2*iA+mB+r2y^2*iB, -r1y*iA*r1x-r2y*iB*r2x, -r1y*iA-r2y*iB]
-    // [ -r1y*iA*r1x-r2y*iB*r2x, mA+r1x^2*iA+mB+r2x^2*iB, r1x*iA+r2x*iB]
-    // [ -r1y*iA-r2y*iB, r1x*iA+r2x*iB, iA+iB]
+    temp
+      ..setFrom(localAnchorA)
+      ..sub(_localCenterA);
+    _rA.setFrom(Rot.mulVec2(qA, temp));
+    temp
+      ..setFrom(localAnchorB)
+      ..sub(_localCenterB);
+    _rB.setFrom(Rot.mulVec2(qB, temp));
 
     double mA = _invMassA, mB = _invMassB;
     double iA = _invIA, iB = _invIB;
@@ -189,7 +147,7 @@ class RevoluteJoint extends Joint {
     }
 
     if (data.step.warmStarting) {
-      final Vector2 P = pool.popVec2();
+      final Vector2 P = Vector2.zero();
       // Scale impulses to support a variable time step.
       _impulse.x *= data.step.dtRatio;
       _impulse.y *= data.step.dtRatio;
@@ -205,7 +163,6 @@ class RevoluteJoint extends Joint {
       vB.x += mB * P.x;
       vB.y += mB * P.y;
       wB += iB * (_rB.cross(P) + _motorImpulse + _impulse.z);
-      pool.pushVec2(1);
     } else {
       _impulse.setZero();
       _motorImpulse = 0.0;
@@ -214,9 +171,6 @@ class RevoluteJoint extends Joint {
     data.velocities[_indexA].w = wA;
     // data.velocities[_indexB].v.set(vB);
     data.velocities[_indexB].w = wB;
-
-    pool.pushVec2(1);
-    pool.pushRot(2);
   }
 
   void solveVelocityConstraints(final SolverData data) {
@@ -245,14 +199,14 @@ class RevoluteJoint extends Joint {
       wA -= iA * impulse;
       wB += iB * impulse;
     }
-    final Vector2 temp = pool.popVec2();
+    final Vector2 temp = Vector2.zero();
 
     // Solve limit constraint.
     if (_enableLimit &&
         _limitState != LimitState.INACTIVE &&
         fixedRotation == false) {
-      final Vector2 Cdot1 = pool.popVec2();
-      final Vector3 Cdot = pool.popVec3();
+      final Vector2 Cdot1 = Vector2.zero();
+      final Vector3 Cdot = Vector3.zero();
 
       // Solve point-to-point constraint
       _rA.scaleOrthogonalInto(wA, temp);
@@ -264,7 +218,7 @@ class RevoluteJoint extends Joint {
       double Cdot2 = wB - wA;
       Cdot.setValues(Cdot1.x, Cdot1.y, Cdot2);
 
-      Vector3 impulse = pool.popVec3();
+      Vector3 impulse = Vector3.zero();
       Matrix3.solve(_mass, impulse, Cdot);
       impulse.negate();
 
@@ -273,7 +227,7 @@ class RevoluteJoint extends Joint {
       } else if (_limitState == LimitState.AT_LOWER) {
         double newImpulse = _impulse.z + impulse.z;
         if (newImpulse < 0.0) {
-          final Vector2 rhs = pool.popVec2();
+          final Vector2 rhs = Vector2.zero();
           rhs
             ..setValues(_mass.entry(0, 2), _mass.entry(1, 2))
             ..scale(_impulse.z)
@@ -285,14 +239,13 @@ class RevoluteJoint extends Joint {
           _impulse.x += temp.x;
           _impulse.y += temp.y;
           _impulse.z = 0.0;
-          pool.pushVec2(1);
         } else {
           _impulse.add(impulse);
         }
       } else if (_limitState == LimitState.AT_UPPER) {
         double newImpulse = _impulse.z + impulse.z;
         if (newImpulse > 0.0) {
-          final Vector2 rhs = pool.popVec2();
+          final Vector2 rhs = Vector2.zero();
           rhs
             ..setValues(_mass.entry(0, 2), _mass.entry(1, 2))
             ..scale(_impulse.z)
@@ -304,12 +257,11 @@ class RevoluteJoint extends Joint {
           _impulse.x += temp.x;
           _impulse.y += temp.y;
           _impulse.z = 0.0;
-          pool.pushVec2(1);
         } else {
           _impulse.add(impulse);
         }
       }
-      final Vector2 P = pool.popVec2();
+      final Vector2 P = Vector2.zero();
 
       P.setValues(impulse.x, impulse.y);
 
@@ -320,13 +272,10 @@ class RevoluteJoint extends Joint {
       vB.x += mB * P.x;
       vB.y += mB * P.y;
       wB += iB * (_rB.cross(P) + impulse.z);
-
-      pool.pushVec2(2);
-      pool.pushVec3(2);
     } else {
       // Solve point-to-point constraint
-      Vector2 Cdot = pool.popVec2();
-      Vector2 impulse = pool.popVec2();
+      Vector2 Cdot = Vector2.zero();
+      Vector2 impulse = Vector2.zero();
 
       _rA.scaleOrthogonalInto(wA, temp);
       _rB.scaleOrthogonalInto(wB, Cdot);
@@ -346,21 +295,17 @@ class RevoluteJoint extends Joint {
       vB.x += mB * impulse.x;
       vB.y += mB * impulse.y;
       wB += iB * _rB.cross(impulse);
-
-      pool.pushVec2(2);
     }
 
     // data.velocities[_indexA].v.set(vA);
     data.velocities[_indexA].w = wA;
     // data.velocities[_indexB].v.set(vB);
     data.velocities[_indexB].w = wB;
-
-    pool.pushVec2(1);
   }
 
   bool solvePositionConstraints(final SolverData data) {
-    final Rot qA = pool.popRot();
-    final Rot qB = pool.popRot();
+    final Rot qA = Rot();
+    final Rot qB = Rot();
     Vector2 cA = data.positions[_indexA].c;
     double aA = data.positions[_indexA].a;
     Vector2 cB = data.positions[_indexB].c;
@@ -413,41 +358,38 @@ class RevoluteJoint extends Joint {
       qA.setAngle(aA);
       qB.setAngle(aB);
 
-      final Vector2 rA = pool.popVec2();
-      final Vector2 rB = pool.popVec2();
-      final Vector2 C = pool.popVec2();
-      final Vector2 impulse = pool.popVec2();
+      final Vector2 rA = Vector2.zero();
+      final Vector2 rB = Vector2.zero();
+      final Vector2 temp = Vector2.zero();
+      final Vector2 impulse = Vector2.zero();
 
-      Rot.mulToOutUnsafe(
-          qA,
-          C
-            ..setFrom(_localAnchorA)
-            ..sub(_localCenterA),
-          rA);
-      Rot.mulToOutUnsafe(
-          qB,
-          C
-            ..setFrom(_localAnchorB)
-            ..sub(_localCenterB),
-          rB);
-      C
+      temp
+        ..setFrom(localAnchorA)
+        ..sub(_localCenterA);
+      rA.setFrom(Rot.mulVec2(qA, temp));
+      temp
+        ..setFrom(localAnchorB)
+        ..sub(_localCenterB);
+      rB.setFrom(Rot.mulVec2(qB, temp));
+
+      temp
         ..setFrom(cB)
         ..add(rB)
         ..sub(cA)
         ..sub(rA);
-      positionError = C.length;
+      positionError = temp.length;
 
       double mA = _invMassA, mB = _invMassB;
       double iA = _invIA, iB = _invIB;
 
-      final Matrix2 K = pool.popMat22();
+      final Matrix2 K = Matrix2.zero();
       double a11 = mA + mB + iA * rA.y * rA.y + iB * rB.y * rB.y;
       double a21 = -iA * rA.x * rA.y - iB * rB.x * rB.y;
       double a12 = a21;
       double a22 = mA + mB + iA * rA.x * rA.x + iB * rB.x * rB.x;
 
       K.setValues(a11, a21, a12, a22);
-      Matrix2.solve(K, impulse, C);
+      Matrix2.solve(K, impulse, temp);
       impulse.negate();
 
       cA.x -= mA * impulse.x;
@@ -457,45 +399,21 @@ class RevoluteJoint extends Joint {
       cB.x += mB * impulse.x;
       cB.y += mB * impulse.y;
       aB += iB * rB.cross(impulse);
-
-      pool.pushVec2(4);
-      pool.pushMat22(1);
     }
-    // data.positions[_indexA].c.set(cA);
     data.positions[_indexA].a = aA;
-    // data.positions[_indexB].c.set(cB);
     data.positions[_indexB].a = aB;
-
-    pool.pushRot(2);
 
     return positionError <= Settings.linearSlop &&
         angularError <= Settings.angularSlop;
-  }
-
-  Vector2 getLocalAnchorA() {
-    return _localAnchorA;
-  }
-
-  Vector2 getLocalAnchorB() {
-    return _localAnchorB;
   }
 
   double getReferenceAngle() {
     return _referenceAngle;
   }
 
-  void getAnchorA(Vector2 argOut) {
-    _bodyA.getWorldPointToOut(_localAnchorA, argOut);
-  }
-
-  void getAnchorB(Vector2 argOut) {
-    _bodyB.getWorldPointToOut(_localAnchorB, argOut);
-  }
-
-  void getReactionForce(double inv_dt, Vector2 argOut) {
-    argOut
-      ..setValues(_impulse.x, _impulse.y)
-      ..scale(inv_dt);
+  @override
+  Vector2 getReactionForce(double inv_dt) {
+    return Vector2(_impulse.x, _impulse.y)..scale(inv_dt);
   }
 
   double getReactionTorque(double inv_dt) {

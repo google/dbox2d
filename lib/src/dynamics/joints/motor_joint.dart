@@ -1,27 +1,3 @@
-/*******************************************************************************
- * Copyright (c) 2015, Daniel Murphy, Google
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *  * Redistributions of source code must retain the above copyright notice,
- *    this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
- * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- ******************************************************************************/
-
 part of box2d;
 
 //Point-to-point constraint
@@ -36,17 +12,13 @@ part of box2d;
 //J = [0 0 -1 0 0 1]
 //K = invI1 + invI2
 
-/**
- * A motor joint is used to control the relative motion between two bodies. A typical usage is to
- * control the movement of a dynamic body with respect to the ground.
- *
- * @author dmurph
- */
+/// A motor joint is used to control the relative motion between two bodies. A typical usage is to
+/// control the movement of a dynamic body with respect to the ground.
 class MotorJoint extends Joint {
   // Solver shared
-  final Vector2 _linearOffset = new Vector2.zero();
+  final Vector2 _linearOffset = Vector2.zero();
   double _angularOffset = 0.0;
-  final Vector2 _linearImpulse = new Vector2.zero();
+  final Vector2 _linearImpulse = Vector2.zero();
   double _angularImpulse = 0.0;
   double _maxForce = 0.0;
   double _maxTorque = 0.0;
@@ -55,20 +27,20 @@ class MotorJoint extends Joint {
   // Solver temp
   int _indexA = 0;
   int _indexB = 0;
-  final Vector2 _rA = new Vector2.zero();
-  final Vector2 _rB = new Vector2.zero();
-  final Vector2 _localCenterA = new Vector2.zero();
-  final Vector2 _localCenterB = new Vector2.zero();
-  final Vector2 _linearError = new Vector2.zero();
+  final Vector2 _rA = Vector2.zero();
+  final Vector2 _rB = Vector2.zero();
+  final Vector2 _localCenterA = Vector2.zero();
+  final Vector2 _localCenterB = Vector2.zero();
+  final Vector2 _linearError = Vector2.zero();
   double _angularError = 0.0;
   double _invMassA = 0.0;
   double _invMassB = 0.0;
   double _invIA = 0.0;
   double _invIB = 0.0;
-  final Matrix2 _linearMass = new Matrix2.zero();
+  final Matrix2 _linearMass = Matrix2.zero();
   double _angularMass = 0.0;
 
-  MotorJoint(IWorldPool pool, MotorJointDef def) : super(pool, def) {
+  MotorJoint(MotorJointDef def) : super(def) {
     _linearOffset.setFrom(def.linearOffset);
     _angularOffset = def.angularOffset;
 
@@ -79,27 +51,26 @@ class MotorJoint extends Joint {
     _correctionFactor = def.correctionFactor;
   }
 
-  void getAnchorA(Vector2 out) {
-    out.setFrom(_bodyA.position);
+  @override
+  Vector2 getAnchorA() {
+    return Vector2.copy(_bodyA.position);
   }
 
-  void getAnchorB(Vector2 out) {
-    out.setFrom(_bodyB.position);
+  @override
+  Vector2 getAnchorB() {
+    return Vector2.copy(_bodyB.position);
   }
 
-  void getReactionForce(double inv_dt, Vector2 out) {
-    out
-      ..setFrom(_linearImpulse)
-      ..scale(inv_dt);
+  @override
+  Vector2 getReactionForce(double inv_dt) {
+    return Vector2.copy(_linearImpulse)..scale(inv_dt);
   }
 
   double getReactionTorque(double inv_dt) {
     return _angularImpulse * inv_dt;
   }
 
-  /**
-   * Set the target linear offset, in frame A, in meters.
-   */
+  /// Set the target linear offset, in frame A, in meters.
   void setLinearOffset(Vector2 linearOffset) {
     if (linearOffset.x != _linearOffset.x ||
         linearOffset.y != _linearOffset.y) {
@@ -109,25 +80,19 @@ class MotorJoint extends Joint {
     }
   }
 
-  /**
-   * Get the target linear offset, in frame A, in meters.
-   */
+  /// Get the target linear offset, in frame A, in meters.
   void getLinearOffsetOut(Vector2 out) {
     out.setFrom(_linearOffset);
   }
 
-  /**
-   * Get the target linear offset, in frame A, in meters. Do not modify.
-   */
+  /// Get the target linear offset, in frame A, in meters. Do not modify.
   Vector2 getLinearOffset() {
     return _linearOffset;
   }
 
-  /**
-   * Set the target angular offset, in radians.
-   *
-   * @param angularOffset
-   */
+  /// Set the target angular offset, in radians.
+  ///
+  /// @param angularOffset
   void setAngularOffset(double angularOffset) {
     if (angularOffset != _angularOffset) {
       _bodyA.setAwake(true);
@@ -140,34 +105,26 @@ class MotorJoint extends Joint {
     return _angularOffset;
   }
 
-  /**
-   * Set the maximum friction force in N.
-   *
-   * @param force
-   */
+  /// Set the maximum friction force in N.
+  ///
+  /// @param force
   void setMaxForce(double force) {
     assert(force >= 0.0);
     _maxForce = force;
   }
 
-  /**
-   * Get the maximum friction force in N.
-   */
+  /// Get the maximum friction force in N.
   double getMaxForce() {
     return _maxForce;
   }
 
-  /**
-   * Set the maximum friction torque in N*m.
-   */
+  /// Set the maximum friction torque in N*m.
   void setMaxTorque(double torque) {
     assert(torque >= 0.0);
     _maxTorque = torque;
   }
 
-  /**
-   * Get the maximum friction torque in N*m.
-   */
+  /// Get the maximum friction torque in N*m.
   double getMaxTorque() {
     return _maxTorque;
   }
@@ -192,10 +149,10 @@ class MotorJoint extends Joint {
     final Vector2 vB = data.velocities[_indexB].v;
     double wB = data.velocities[_indexB].w;
 
-    final Rot qA = pool.popRot();
-    final Rot qB = pool.popRot();
-    final Vector2 temp = pool.popVec2();
-    Matrix2 K = pool.popMat22();
+    final Rot qA = Rot();
+    final Rot qB = Rot();
+    final Vector2 temp = Vector2.zero();
+    Matrix2 K = Matrix2.zero();
 
     qA.setAngle(aA);
     qB.setAngle(aB);
@@ -233,8 +190,7 @@ class MotorJoint extends Joint {
       _angularMass = 1.0 / _angularMass;
     }
 
-    // _linearError = cB + _rB - cA - _rA - b2Mul(qA, _linearOffset);
-    Rot.mulToOutUnsafe(qA, _linearOffset, temp);
+    temp.setFrom(Rot.mulVec2(qA, _linearOffset));
     _linearError.x = cB.x + _rB.x - cA.x - _rA.x - temp.x;
     _linearError.y = cB.y + _rB.y - cA.y - _rA.y - temp.y;
     _angularError = aB - aA - _angularOffset;
@@ -257,13 +213,7 @@ class MotorJoint extends Joint {
       _angularImpulse = 0.0;
     }
 
-    pool.pushVec2(1);
-    pool.pushMat22(1);
-    pool.pushRot(2);
-
-    // data.velocities[_indexA].v = vA;
     data.velocities[_indexA].w = wA;
-    // data.velocities[_indexB].v = vB;
     data.velocities[_indexB].w = wB;
   }
 
@@ -279,7 +229,7 @@ class MotorJoint extends Joint {
     double h = data.step.dt;
     double inv_h = data.step.inv_dt;
 
-    final Vector2 temp = pool.popVec2();
+    final Vector2 temp = Vector2.zero();
 
     // Solve angular friction
     {
@@ -296,7 +246,7 @@ class MotorJoint extends Joint {
       wB += iB * impulse;
     }
 
-    final Vector2 Cdot = pool.popVec2();
+    final Vector2 Cdot = Vector2.zero();
 
     // Solve linear friction
     {
@@ -316,7 +266,7 @@ class MotorJoint extends Joint {
       final Vector2 impulse = temp;
       _linearMass.transformed(Cdot, impulse);
       impulse.negate();
-      final Vector2 oldImpulse = pool.popVec2();
+      final Vector2 oldImpulse = Vector2.zero();
       oldImpulse.setFrom(_linearImpulse);
       _linearImpulse.add(impulse);
 
@@ -338,8 +288,6 @@ class MotorJoint extends Joint {
       vB.y += mB * impulse.y;
       wB += iB * (_rB.x * impulse.y - _rB.y * impulse.x);
     }
-
-    pool.pushVec2(3);
 
     // data.velocities[_indexA].v.set(vA);
     data.velocities[_indexA].w = wA;

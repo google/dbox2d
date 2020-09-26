@@ -1,27 +1,3 @@
-/*******************************************************************************
- * Copyright (c) 2015, Daniel Murphy, Google
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *  * Redistributions of source code must retain the above copyright notice,
- *    this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
- * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- ******************************************************************************/
-
 part of box2d;
 
 /*
@@ -142,9 +118,7 @@ part of box2d;
  However, we can compute sin+cos of the same angle fast.
  */
 
-/**
- * This is an internal class.
- */
+/// This is an internal class.
 class Island {
   ContactListener _listener;
 
@@ -163,9 +137,16 @@ class Island {
   int _contactCapacity = 0;
   int _jointCapacity = 0;
 
+  Island() {
+    _bodies = List<Body>(_bodyCapacity);
+    _contacts = List<Contact>(_contactCapacity);
+    _joints = List<Joint>(_jointCapacity);
+    _velocities = List<Velocity>(0);
+    _positions = List<Position>(0);
+  }
+
   void init(int bodyCapacity, int contactCapacity, int jointCapacity,
       ContactListener listener) {
-    // System.out.println("Initializing Island");
     _bodyCapacity = bodyCapacity;
     _contactCapacity = contactCapacity;
     _jointCapacity = jointCapacity;
@@ -175,36 +156,28 @@ class Island {
 
     _listener = listener;
 
-    if (_bodies == null || _bodyCapacity > _bodies.length) {
-      _bodies = new List<Body>(_bodyCapacity);
-    }
-    if (_joints == null || _jointCapacity > _joints.length) {
-      _joints = new List<Joint>(_jointCapacity);
-    }
-    if (_contacts == null || _contactCapacity > _contacts.length) {
-      _contacts = new List<Contact>(_contactCapacity);
+    if (_bodyCapacity > _bodies.length) {
+      _bodies = List<Body>(_bodyCapacity);
     }
 
-    // dynamic array
-    if (_velocities == null || _bodyCapacity > _velocities.length) {
-      final List<Velocity> old =
-          _velocities == null ? new List<Velocity>(0) : _velocities;
-      _velocities = new List<Velocity>(_bodyCapacity);
-      BufferUtils.arraycopy(old, 0, _velocities, 0, old.length);
-      for (int i = old.length; i < _velocities.length; i++) {
-        _velocities[i] = new Velocity();
-      }
+    if (_contactCapacity > _contacts.length) {
+      _contacts = List<Contact>(_contactCapacity);
     }
 
-    // dynamic array
-    if (_positions == null || _bodyCapacity > _positions.length) {
-      final List<Position> old =
-          _positions == null ? new List<Position>(0) : _positions;
-      _positions = new List<Position>(_bodyCapacity);
-      BufferUtils.arraycopy(old, 0, _positions, 0, old.length);
-      for (int i = old.length; i < _positions.length; i++) {
-        _positions[i] = new Position();
-      }
+    if (_jointCapacity > _joints.length) {
+      _joints = List<Joint>(_jointCapacity);
+    }
+
+    if (_bodyCapacity > _velocities.length) {
+      _velocities = List.generate(_bodyCapacity,
+          (i) => _velocities.length > i ? _velocities[i] : Velocity(),
+          growable: false);
+    }
+
+    if (_bodyCapacity > _positions.length) {
+      _positions = List.generate(_bodyCapacity,
+          (i) => _positions.length > i ? _positions[i] : Position(),
+          growable: false);
     }
   }
 
@@ -214,12 +187,11 @@ class Island {
     _jointCount = 0;
   }
 
-  final ContactSolver _contactSolver = new ContactSolver();
-  final SolverData _solverData = new SolverData();
-  final ContactSolverDef _solverDef = new ContactSolverDef();
+  final ContactSolver _contactSolver = ContactSolver();
+  final SolverData _solverData = SolverData();
+  final ContactSolverDef _solverDef = ContactSolverDef();
 
   void solve(Profile profile, TimeStep step, Vector2 gravity, bool allowSleep) {
-    // System.out.println("Solving Island");
     double h = step.dt;
 
     // Integrate velocities and apply damping. Initialize the body state.
@@ -237,7 +209,6 @@ class Island {
 
       if (b._bodyType == BodyType.DYNAMIC) {
         // Integrate velocities.
-        // v += h * (b._gravityScale * gravity + b._invMass * b._force);
         v.x += h * (b._gravityScale * gravity.x + b._invMass * b._force.x);
         v.y += h * (b._gravityScale * gravity.y + b._invMass * b._force.y);
         w += h * b._invI * b._torque;
@@ -276,11 +247,9 @@ class Island {
     _solverDef.velocities = _velocities;
 
     _contactSolver.init(_solverDef);
-    // System.out.println("island init vel");
     _contactSolver.initializeVelocityConstraints();
 
     if (step.warmStarting) {
-      // System.out.println("island warm start");
       _contactSolver.warmStart();
     }
 
@@ -288,7 +257,6 @@ class Island {
       _joints[i].initVelocityConstraints(_solverData);
     }
 
-    // System.out.println("island solving velocities");
     for (int i = 0; i < step.velocityIterations; ++i) {
       for (int j = 0; j < _jointCount; ++j) {
         _joints[j].solveVelocityConstraints(_solverData);
@@ -308,14 +276,14 @@ class Island {
       double w = _velocities[i].w;
 
       // Check for large velocities
-      double translationx = v.x * h;
-      double translationy = v.y * h;
+      double translationX = v.x * h;
+      double translationY = v.y * h;
 
-      if (translationx * translationx + translationy * translationy >
+      if (translationX * translationX + translationY * translationY >
           Settings.maxTranslationSquared) {
         double ratio = Settings.maxTranslation /
             Math.sqrt(
-                translationx * translationx + translationy * translationy);
+                translationX * translationX + translationY * translationY);
         v.x *= ratio;
         v.y *= ratio;
       }
@@ -368,7 +336,7 @@ class Island {
     report(_contactSolver._velocityConstraints);
 
     if (allowSleep) {
-      double minSleepTime = double.MAX_FINITE;
+      double minSleepTime = double.maxFinite;
 
       final double linTolSqr =
           Settings.linearSleepTolerance * Settings.linearSleepTolerance;
@@ -393,16 +361,13 @@ class Island {
       }
 
       if (minSleepTime >= Settings.timeToSleep && positionSolved) {
-        for (int i = 0; i < _bodyCount; ++i) {
-          Body b = _bodies[i];
-          b.setAwake(false);
-        }
+        _bodies.forEach((b) => b?.setAwake(false));
       }
     }
   }
 
-  final ContactSolver _toiContactSolver = new ContactSolver();
-  final ContactSolverDef _toiSolverDef = new ContactSolverDef();
+  final ContactSolver _toiContactSolver = ContactSolver();
+  final ContactSolverDef _toiSolverDef = ContactSolverDef();
 
   void solveTOI(TimeStep subStep, int toiIndexA, int toiIndexB) {
     assert(toiIndexA < _bodyCount);
@@ -433,38 +398,6 @@ class Island {
         break;
       }
     }
-    // #if 0
-    // // Is the new position really safe?
-    // for (int i = 0; i < _contactCount; ++i)
-    // {
-    // Contact* c = _contacts[i];
-    // Fixture* fA = c.fixtureA;
-    // Fixture* fB = c.fixtureB;
-    //
-    // Body bA = fA.GetBody();
-    // Body bB = fB.GetBody();
-    //
-    // int indexA = c.GetChildIndexA();
-    // int indexB = c.GetChildIndexB();
-    //
-    // DistanceInput input;
-    // input.proxyA.Set(fA.GetShape(), indexA);
-    // input.proxyB.Set(fB.GetShape(), indexB);
-    // input.transformA = bA.GetTransform();
-    // input.transformB = bB.GetTransform();
-    // input.useRadii = false;
-    //
-    // DistanceOutput output;
-    // SimplexCache cache;
-    // cache.count = 0;
-    // Distance(&output, &cache, &input);
-    //
-    // if (output.distance == 0 || cache.count == 3)
-    // {
-    // cache.count += 0;
-    // }
-    // }
-    // #endif
 
     // Leap of faith to new safe state.
     _bodies[toiIndexA]._sweep.c0.x = _positions[toiIndexA].c.x;
@@ -495,13 +428,13 @@ class Island {
       double w = _velocities[i].w;
 
       // Check for large velocities
-      double translationx = v.x * h;
-      double translationy = v.y * h;
-      if (translationx * translationx + translationy * translationy >
+      double translationX = v.x * h;
+      double translationY = v.y * h;
+      if (translationX * translationX + translationY * translationY >
           Settings.maxTranslationSquared) {
         double ratio = Settings.maxTranslation /
             Math.sqrt(
-                translationx * translationx + translationy * translationy);
+                translationX * translationX + translationY * translationY);
         v.scale(ratio);
       }
 
@@ -554,7 +487,7 @@ class Island {
     _joints[_jointCount++] = joint;
   }
 
-  final ContactImpulse _impulse = new ContactImpulse();
+  final ContactImpulse _impulse = ContactImpulse();
 
   void report(List<ContactVelocityConstraint> constraints) {
     if (_listener == null) {

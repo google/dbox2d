@@ -1,38 +1,11 @@
-/*******************************************************************************
- * Copyright (c) 2015, Daniel Murphy, Google
- * All rights reserved.
- * 
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *  * Redistributions of source code must retain the above copyright notice,
- *    this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
- * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- ******************************************************************************/
-
 part of box2d;
 
-/**
- * The broad-phase is used for computing pairs and performing volume queries and ray casts. This
- * broad-phase does not persist pairs. Instead, this reports potentially new pairs. It is up to the
- * client to consume the new pairs and to track subsequent overlap.
- * 
- * @author Daniel Murphy
- */
+/// The broad-phase is used for computing pairs and performing volume queries and ray casts. This
+/// broad-phase does not persist pairs. Instead, this reports potentially new pairs. It is up to the
+/// client to consume the new pairs and to track subsequent overlap.
 class DefaultBroadPhaseBuffer implements TreeCallback, BroadPhase {
   final BroadPhaseStrategy _tree;
+  final int _mask32Bits = 4294967295; // 2^32-1
 
   int _proxyCount = 0;
 
@@ -40,18 +13,18 @@ class DefaultBroadPhaseBuffer implements TreeCallback, BroadPhase {
   int _moveCapacity = 16;
   int _moveCount = 0;
 
-  List<Pair> _pairBuffer;
+  List<int> _pairBuffer;
   int _pairCapacity = 16;
   int _pairCount = 0;
 
   int _queryProxyId = BroadPhase.NULL_PROXY;
 
   DefaultBroadPhaseBuffer(BroadPhaseStrategy strategy) : _tree = strategy {
-    _pairBuffer = new List<Pair>(_pairCapacity);
+    _pairBuffer = List<int>(_pairCapacity);
     for (int i = 0; i < _pairCapacity; i++) {
-      _pairBuffer[i] = new Pair();
+      _pairBuffer[i] = 0;
     }
-    _moveBuffer = BufferUtils.allocClearIntList(_moveCapacity);
+    _moveBuffer = BufferUtils.intList(_moveCapacity);
   }
 
   int createProxy(final AABB aabb, Object userData) {
@@ -87,8 +60,6 @@ class DefaultBroadPhaseBuffer implements TreeCallback, BroadPhase {
   }
 
   bool testOverlap(int proxyIdA, int proxyIdB) {
-    // return AABB.testOverlap(proxyA.aabb, proxyB.aabb);
-    // return _tree.overlap(proxyIdA, proxyIdB);
     final AABB a = _tree.getFatAABB(proxyIdA);
     final AABB b = _tree.getFatAABB(proxyIdB);
     if (b.lowerBound.x - a.upperBound.x > 0.0 ||
@@ -128,10 +99,8 @@ class DefaultBroadPhaseBuffer implements TreeCallback, BroadPhase {
       final AABB fatAABB = _tree.getFatAABB(_queryProxyId);
 
       // Query tree, create pairs and add them pair buffer.
-      // log.debug("quering aabb: "+_queryProxy.aabb);
       _tree.query(this, fatAABB);
     }
-    // log.debug("Number of pairs found: "+_pairCount);
 
     // Reset move buffer
     _moveCount = 0;
@@ -142,19 +111,17 @@ class DefaultBroadPhaseBuffer implements TreeCallback, BroadPhase {
     // Send the pairs back to the client.
     int i = 0;
     while (i < _pairCount) {
-      Pair primaryPair = _pairBuffer[i];
-      Object userDataA = _tree.getUserData(primaryPair.proxyIdA);
-      Object userDataB = _tree.getUserData(primaryPair.proxyIdB);
+      int primaryPair = _pairBuffer[i];
+      Object userDataA = _tree.getUserData(primaryPair >> 32);
+      Object userDataB = _tree.getUserData(primaryPair & _mask32Bits);
 
-      // log.debug("returning pair: "+userDataA+", "+userDataB);
       callback.addPair(userDataA, userDataB);
       ++i;
 
       // Skip any duplicate pairs.
       while (i < _pairCount) {
-        Pair pair = _pairBuffer[i];
-        if (pair.proxyIdA != primaryPair.proxyIdA ||
-            pair.proxyIdB != primaryPair.proxyIdB) {
+        int pair = _pairBuffer[i];
+        if (pair != primaryPair) {
           break;
         }
         ++i;
@@ -186,8 +153,8 @@ class DefaultBroadPhaseBuffer implements TreeCallback, BroadPhase {
     if (_moveCount == _moveCapacity) {
       List<int> old = _moveBuffer;
       _moveCapacity *= 2;
-      _moveBuffer = new List<int>(_moveCapacity);
-      BufferUtils.arraycopy(old, 0, _moveBuffer, 0, old.length);
+      _moveBuffer = List<int>(_moveCapacity);
+      BufferUtils.arrayCopy(old, 0, _moveBuffer, 0, old.length);
     }
 
     _moveBuffer[_moveCount] = proxyId;
@@ -202,9 +169,7 @@ class DefaultBroadPhaseBuffer implements TreeCallback, BroadPhase {
     }
   }
 
-  /**
-   * This is called from DynamicTree::query when we are gathering pairs.
-   */
+  /// This is called from DynamicTree::query when we are gathering pairs.
   bool treeCallback(int proxyId) {
     // A proxy cannot form a pair with itself.
     if (proxyId == _queryProxyId) {
@@ -213,21 +178,19 @@ class DefaultBroadPhaseBuffer implements TreeCallback, BroadPhase {
 
     // Grow the pair buffer as needed.
     if (_pairCount == _pairCapacity) {
-      List<Pair> oldBuffer = _pairBuffer;
+      List<int> oldBuffer = _pairBuffer;
       _pairCapacity *= 2;
-      _pairBuffer = new List<Pair>(_pairCapacity);
-      BufferUtils.arraycopy(oldBuffer, 0, _pairBuffer, 0, oldBuffer.length);
+      _pairBuffer = List<int>(_pairCapacity);
+      BufferUtils.arrayCopy(oldBuffer, 0, _pairBuffer, 0, oldBuffer.length);
       for (int i = oldBuffer.length; i < _pairCapacity; i++) {
-        _pairBuffer[i] = new Pair();
+        _pairBuffer[i] = 0;
       }
     }
 
     if (proxyId < _queryProxyId) {
-      _pairBuffer[_pairCount].proxyIdA = proxyId;
-      _pairBuffer[_pairCount].proxyIdB = _queryProxyId;
+      _pairBuffer[_pairCount] = (proxyId << 32) | _queryProxyId;
     } else {
-      _pairBuffer[_pairCount].proxyIdA = _queryProxyId;
-      _pairBuffer[_pairCount].proxyIdB = proxyId;
+      _pairBuffer[_pairCount] = (_queryProxyId << 32) | proxyId;
     }
 
     ++_pairCount;

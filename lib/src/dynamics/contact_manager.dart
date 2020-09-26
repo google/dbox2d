@@ -1,35 +1,6 @@
-/*******************************************************************************
- * Copyright (c) 2015, Daniel Murphy, Google
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *  * Redistributions of source code must retain the above copyright notice,
- *    this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
- * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- ******************************************************************************/
-
 part of box2d;
 
-/**
- * Delegate of World.
- *
- * @author Daniel Murphy
- */
-
+/// Delegate of World.
 class ContactManager implements PairCallback {
   BroadPhase broadPhase;
   Contact contactList;
@@ -37,21 +8,16 @@ class ContactManager implements PairCallback {
   ContactFilter contactFilter;
   ContactListener contactListener;
 
-  final World _pool;
+  final World _world;
 
-  ContactManager(this._pool, BroadPhase broadPhase_) {
+  ContactManager(this._world, BroadPhase broadPhase_) {
     contactList = null;
-    contactFilter = new ContactFilter();
+    contactFilter = ContactFilter();
     contactListener = null;
     broadPhase = broadPhase_;
   }
 
-  /**
-   * Broad-phase callback.
-   *
-   * @param proxyUserDataA
-   * @param proxyUserDataB
-   */
+  /// Broad-phase callback.
   void addPair(FixtureProxy proxyUserDataA, FixtureProxy proxyUserDataB) {
     FixtureProxy proxyA = proxyUserDataA;
     FixtureProxy proxyB = proxyUserDataB;
@@ -106,8 +72,7 @@ class ContactManager implements PairCallback {
       return;
     }
 
-    // Call the factory.
-    Contact c = _pool.popContact(fixtureA, indexA, fixtureB, indexB);
+    Contact c = Contact.init(fixtureA, indexA, fixtureB, indexB);
     if (c == null) {
       return;
     }
@@ -214,15 +179,17 @@ class ContactManager implements PairCallback {
       bodyB._contactList = c._nodeB.next;
     }
 
-    // Call the factory.
-    _pool.pushContact(c);
+    if (c._manifold.pointCount > 0 &&
+        !fixtureA.isSensor() &&
+        !fixtureB.isSensor()) {
+      fixtureA.getBody().setAwake(true);
+      fixtureB.getBody().setAwake(true);
+    }
     --contactCount;
   }
 
-  /**
-   * This is the top level collision call for the time step. Here all the narrow phase collision is
-   * processed for the world contact list.
-   */
+  /// This is the top level collision call for the time step. Here all the narrow phase collision is
+  /// processed for the world contact list.
   void collide() {
     // Update awake contacts.
     Contact c = contactList;

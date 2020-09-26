@@ -1,31 +1,7 @@
-/*******************************************************************************
- * Copyright (c) 2015, Daniel Murphy, Google
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *  * Redistributions of source code must retain the above copyright notice,
- *    this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
- * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- ******************************************************************************/
-
-import 'package:box2d/box2d.dart';
+import '../lib/box2d.dart';
 
 void main() {
-  new Bench2d()
+  Bench2d()
     ..initialize()
     ..warmup()
     ..bench();
@@ -64,30 +40,33 @@ double percentile(List<double> values, double pc) {
 class Bench2d {
   final World world;
 
-  Bench2d() : world = new World.withGravity(new Vector2(0.0, -10.0));
+  Bench2d() : world = World(Vector2(0.0, -10.0));
 
   void initialize() {
-    BodyDef bd = new BodyDef();
+    BodyDef bd = BodyDef();
     Body ground = world.createBody(bd);
 
-    EdgeShape groundShape = new EdgeShape()
-      ..set(new Vector2(-40.0, 0.0), new Vector2(40.0, 0.0));
+    PolygonShape groundShape = PolygonShape()
+      ..setAsEdge(Vector2(-20.0, -30.0), Vector2(20.0, -30.0));
     ground.createFixtureFromShape(groundShape, 0.0);
+    //EdgeShape groundShape = EdgeShape()
+    //  ..set(Vector2(-40.0, -30.0), Vector2(40.0, -30.0));
+    //ground.createFixtureFromShape(groundShape, 0.0);
 
     // add boxes
     const boxSize = .5;
-    PolygonShape shape = new PolygonShape()..setAsBoxXY(boxSize, boxSize);
+    PolygonShape shape = PolygonShape()..setAsBoxXY(boxSize, boxSize);
 
-    Vector2 x = new Vector2(-7.0, 0.75);
-    Vector2 y = new Vector2.zero();
-    Vector2 deltaX = new Vector2(0.5625, 1.0);
-    Vector2 deltaY = new Vector2(1.125, 0.0);
+    Vector2 x = Vector2(-7.0, 0.75);
+    Vector2 y = Vector2.zero();
+    Vector2 deltaX = Vector2(0.5625, 1.0);
+    Vector2 deltaY = Vector2(1.125, 0.0);
 
     for (int i = 0; i < PYRAMID_SIZE; ++i) {
       y.setFrom(x);
 
       for (int j = i; j < PYRAMID_SIZE; ++j) {
-        BodyDef bd = new BodyDef()
+        BodyDef bd = BodyDef()
           ..type = BodyType.DYNAMIC
           ..position.setFrom(y);
         world.createBody(bd)..createFixtureFromShape(shape, 5.0);
@@ -96,11 +75,13 @@ class Bench2d {
 
       x.add(deltaX);
     }
+    // TODO: Why does some bodies sleep prematurely
+    world.setAllowSleep(false);
   }
 
   List<double> bench() {
-    List<double> times = new List<double>(FRAMES);
-    Stopwatch stopwatch = new Stopwatch()..start();
+    List<double> times = List<double>(FRAMES);
+    Stopwatch stopwatch = Stopwatch()..start();
     for (int i = 0; i < FRAMES; ++i) {
       int begin = stopwatch.elapsedMilliseconds;
       step();
@@ -132,8 +113,8 @@ class Bench2d {
   }
 
   void checksum(World world) {
-    Vector2 positionSum = new Vector2.zero();
-    Vector2 linearVelocitySum = new Vector2.zero();
+    Vector2 positionSum = Vector2.zero();
+    Vector2 linearVelocitySum = Vector2.zero();
     double angularVelocitySum = 0.0;
     var checksum = (Body b) {
       positionSum = positionSum + b.position;

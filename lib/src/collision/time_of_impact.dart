@@ -1,63 +1,26 @@
-/*******************************************************************************
- * Copyright (c) 2015, Daniel Murphy, Google
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *  * Redistributions of source code must retain the above copyright notice,
- *    this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
- * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- ******************************************************************************/
-
 part of box2d;
 
-/**
- * Input parameters for TOI
- *
- * @author Daniel Murphy
- */
+/// Input parameters for TOI
 class TOIInput {
-  final DistanceProxy proxyA = new DistanceProxy();
-  final DistanceProxy proxyB = new DistanceProxy();
-  final Sweep sweepA = new Sweep();
-  final Sweep sweepB = new Sweep();
-  /**
-   * defines sweep interval [0, tMax]
-   */
+  final DistanceProxy proxyA = DistanceProxy();
+  final DistanceProxy proxyB = DistanceProxy();
+  final Sweep sweepA = Sweep();
+  final Sweep sweepB = Sweep();
+
+  /// defines sweep interval [0, tMax]
   double tMax = 0.0;
 }
 
 enum TOIOutputState { UNKNOWN, FAILED, OVERLAPPED, TOUCHING, SEPARATED }
 
-/**
- * Output parameters for TimeOfImpact
- *
- * @author daniel
- */
+/// Output parameters for TimeOfImpact
 class TOIOutput {
   TOIOutputState state = TOIOutputState.UNKNOWN;
   double t = 0.0;
 }
 
-/**
- * Class used for computing the time of impact. This class should not be constructed usually, just
- * retrieve from the {@link SingletonPool#getTOI()}.
- *
- * @author daniel
- */
+/// Class used for computing the time of impact. This class should not be constructed usually, just
+/// retrieve from the {@link SingletonPool#getTOI()}.
 class TimeOfImpact {
   static const int MAX_ITERATIONS = 20;
   static const int MAX_ROOT_ITERATIONS = 50;
@@ -69,29 +32,22 @@ class TimeOfImpact {
   static int toiMaxRootIters = 0;
 
   // djm pooling
-  final SimplexCache _cache = new SimplexCache();
-  final DistanceInput _distanceInput = new DistanceInput();
-  final Transform _xfA = new Transform.zero();
-  final Transform _xfB = new Transform.zero();
-  final DistanceOutput _distanceOutput = new DistanceOutput();
-  final SeparationFunction _fcn = new SeparationFunction();
-  final List<int> _indexes = BufferUtils.allocClearIntList(2);
-  final Sweep _sweepA = new Sweep();
-  final Sweep _sweepB = new Sweep();
+  final SimplexCache _cache = SimplexCache();
+  final DistanceInput _distanceInput = DistanceInput();
+  final Transform _xfA = Transform.zero();
+  final Transform _xfB = Transform.zero();
+  final DistanceOutput _distanceOutput = DistanceOutput();
+  final SeparationFunction _fcn = SeparationFunction();
+  final List<int> _indexes = BufferUtils.intList(2);
+  final Sweep _sweepA = Sweep();
+  final Sweep _sweepB = Sweep();
 
-  final IWorldPool _pool;
+  TimeOfImpact();
 
-  TimeOfImpact(this._pool);
-
-  /**
-   * Compute the upper bound on time before two shapes penetrate. Time is represented as a fraction
-   * between [0,tMax]. This uses a swept separating axis and may miss some intermediate,
-   * non-tunneling collision. If you change the time interval, you should call this function again.
-   * Note: use Distance to compute the contact point and normal at the time of impact.
-   *
-   * @param output
-   * @param input
-   */
+  /// Compute the upper bound on time before two shapes penetrate. Time is represented as a fraction
+  /// between [0,tMax]. This uses a swept separating axis and may miss some intermediate,
+  /// non-tunneling collision. If you change the time interval, you should call this function again.
+  /// Note: use Distance to compute the contact point and normal at the time of impact.
   void timeOfImpact(TOIOutput output, TOIInput input) {
     // CCD via the local separating axis method. This seeks progression
     // by computing the largest time at which separation is maintained.
@@ -135,18 +91,11 @@ class TimeOfImpact {
     for (;;) {
       _sweepA.getTransform(_xfA, t1);
       _sweepB.getTransform(_xfB, t1);
-      // System.out.printf("sweepA: %f, %f, sweepB: %f, %f\n",
-      // sweepA.c.x, sweepA.c.y, sweepB.c.x, sweepB.c.y);
       // Get the distance between shapes. We can also use the results
       // to get a separating axis
       _distanceInput.transformA = _xfA;
       _distanceInput.transformB = _xfB;
-      _pool.getDistance().distance(_distanceOutput, _cache, _distanceInput);
-
-      // System.out.printf("Dist: %f at points %f, %f and %f, %f.  %d iterations\n",
-      // distanceOutput.distance, distanceOutput.pointA.x, distanceOutput.pointA.y,
-      // distanceOutput.pointB.x, distanceOutput.pointB.y,
-      // distanceOutput.iterations);
+      World.distance.compute(_distanceOutput, _cache, _distanceInput);
 
       // If the shapes are overlapped, we give up on continuous collision.
       if (_distanceOutput.distance <= 0.0) {
@@ -175,7 +124,6 @@ class TimeOfImpact {
       for (;;) {
         // Find the deepest point at t2. Store the witness point indices.
         double s2 = _fcn.findMinSeparation(_indexes, t2);
-        // System.out.printf("s2: %f\n", s2);
         // Is the final configuration separated?
         if (s2 > target + tolerance) {
           // Victory!
@@ -196,8 +144,6 @@ class TimeOfImpact {
         double s1 = _fcn.evaluate(_indexes[0], _indexes[1], t1);
         // Check for initial overlap. This might happen if the root finder
         // runs out of iterations.
-        // System.out.printf("s1: %f, target: %f, tolerance: %f\n", s1, target,
-        // tolerance);
         if (s1 < target - tolerance) {
           output.state = TOIOutputState.FAILED;
           output.t = t1;
@@ -267,12 +213,10 @@ class TimeOfImpact {
       ++toiIters;
 
       if (done) {
-        // System.out.println("done");
         break;
       }
 
       if (iter == MAX_ITERATIONS) {
-        // System.out.println("failed, root finder stuck");
         // Root finder got stuck. Semi-victory.
         output.state = TOIOutputState.FAILED;
         output.t = t1;
@@ -280,7 +224,6 @@ class TimeOfImpact {
       }
     }
 
-    // System.out.printf("final sweeps: %f, %f, %f; %f, %f, %f", input.s)
     toiMaxIters = Math.max(toiMaxIters, iter);
   }
 } // Class TimeOfImpact.
@@ -291,24 +234,24 @@ class SeparationFunction {
   DistanceProxy proxyA;
   DistanceProxy proxyB;
   SeparationFunctionType type;
-  final Vector2 localPoint = new Vector2.zero();
-  final Vector2 axis = new Vector2.zero();
+  final Vector2 localPoint = Vector2.zero();
+  final Vector2 axis = Vector2.zero();
   Sweep sweepA;
   Sweep sweepB;
 
   // djm pooling
-  final Vector2 _localPointA = new Vector2.zero();
-  final Vector2 _localPointB = new Vector2.zero();
-  final Vector2 _pointA = new Vector2.zero();
-  final Vector2 _pointB = new Vector2.zero();
-  final Vector2 _localPointA1 = new Vector2.zero();
-  final Vector2 _localPointA2 = new Vector2.zero();
-  final Vector2 _normal = new Vector2.zero();
-  final Vector2 _localPointB1 = new Vector2.zero();
-  final Vector2 _localPointB2 = new Vector2.zero();
-  final Vector2 _temp = new Vector2.zero();
-  final Transform _xfa = new Transform.zero();
-  final Transform _xfb = new Transform.zero();
+  final Vector2 _localPointA = Vector2.zero();
+  final Vector2 _localPointB = Vector2.zero();
+  final Vector2 _pointA = Vector2.zero();
+  final Vector2 _pointB = Vector2.zero();
+  final Vector2 _localPointA1 = Vector2.zero();
+  final Vector2 _localPointA2 = Vector2.zero();
+  final Vector2 _normal = Vector2.zero();
+  final Vector2 _localPointB1 = Vector2.zero();
+  final Vector2 _localPointB2 = Vector2.zero();
+  final Vector2 _temp = Vector2.zero();
+  final Transform _xfa = Transform.zero();
+  final Transform _xfb = Transform.zero();
 
   // TODO_ERIN might not need to return the separation
 
@@ -330,21 +273,12 @@ class SeparationFunction {
     sweepA.getTransform(_xfa, t1);
     sweepB.getTransform(_xfb, t1);
 
-    // log.debug("initializing separation.\n" +
-    // "cache: "+cache.count+"-"+cache.metric+"-"+cache.indexA+"-"+cache.indexB+"\n"
-    // "distance: "+proxyA.
-
     if (count == 1) {
       type = SeparationFunctionType.POINTS;
-      /*
-       * Vec2 localPointA = proxyA.GetVertex(cache.indexA[0]); Vec2 localPointB =
-       * proxyB.GetVertex(cache.indexB[0]); Vec2 pointA = Mul(transformA, localPointA); Vec2
-       * pointB = Mul(transformB, localPointB); axis = pointB - pointA; axis.Normalize();
-       */
       _localPointA.setFrom(proxyA.getVertex(cache.indexA[0]));
       _localPointB.setFrom(proxyB.getVertex(cache.indexB[0]));
-      Transform.mulToOutUnsafeVec2(_xfa, _localPointA, _pointA);
-      Transform.mulToOutUnsafeVec2(_xfb, _localPointB, _pointB);
+      _pointA.setFrom(Transform.mulVec2(_xfa, _localPointA));
+      _pointB.setFrom(Transform.mulVec2(_xfb, _localPointB));
       axis
         ..setFrom(_pointB)
         ..sub(_pointA);
@@ -363,16 +297,16 @@ class SeparationFunction {
       _temp.scaleOrthogonalInto(-1.0, axis);
       axis.normalize();
 
-      Rot.mulToOutUnsafe(_xfb.q, axis, _normal);
+      _normal.setFrom(Rot.mulVec2(_xfb.q, axis));
 
       localPoint
         ..setFrom(_localPointB1)
         ..add(_localPointB2)
         ..scale(.5);
-      Transform.mulToOutUnsafeVec2(_xfb, localPoint, _pointB);
+      _pointB.setFrom(Transform.mulVec2(_xfb, localPoint));
 
       _localPointA.setFrom(proxyA.getVertex(cache.indexA[0]));
-      Transform.mulToOutUnsafeVec2(_xfa, _localPointA, _pointA);
+      _pointA.setFrom(Transform.mulVec2(_xfa, _localPointA));
 
       _temp
         ..setFrom(_pointA)
@@ -396,16 +330,16 @@ class SeparationFunction {
       _temp.scaleOrthogonalInto(-1.0, axis);
       axis.normalize();
 
-      Rot.mulToOutUnsafe(_xfa.q, axis, _normal);
+      _normal.setFrom(Rot.mulVec2(_xfa.q, axis));
 
       localPoint
         ..setFrom(_localPointA1)
         ..add(_localPointA2)
         ..scale(.5);
-      Transform.mulToOutUnsafeVec2(_xfa, localPoint, _pointA);
+      _pointA.setFrom(Transform.mulVec2(_xfa, localPoint));
 
       _localPointB.setFrom(proxyB.getVertex(cache.indexB[0]));
-      Transform.mulToOutUnsafeVec2(_xfb, _localPointB, _pointB);
+      _pointB.setFrom(Transform.mulVec2(_xfb, _localPointB));
 
       _temp
         ..setFrom(_pointB)
@@ -419,8 +353,8 @@ class SeparationFunction {
     }
   }
 
-  final Vector2 _axisA = new Vector2.zero();
-  final Vector2 _axisB = new Vector2.zero();
+  final Vector2 _axisA = Vector2.zero();
+  final Vector2 _axisB = Vector2.zero();
 
   // double FindMinSeparation(int* indexA, int* indexB, double t) const
   double findMinSeparation(List<int> indexes, double t) {
@@ -429,8 +363,8 @@ class SeparationFunction {
 
     switch (type) {
       case SeparationFunctionType.POINTS:
-        Rot.mulTransUnsafeVec2(_xfa.q, axis, _axisA);
-        Rot.mulTransUnsafeVec2(_xfb.q, axis..negate(), _axisB);
+        _axisA.setFrom(Rot.mulTransVec2(_xfa.q, axis));
+        _axisB.setFrom(Rot.mulTransVec2(_xfb.q, axis..negate()));
         axis.negate();
 
         indexes[0] = proxyA.getSupport(_axisA);
@@ -439,40 +373,40 @@ class SeparationFunction {
         _localPointA.setFrom(proxyA.getVertex(indexes[0]));
         _localPointB.setFrom(proxyB.getVertex(indexes[1]));
 
-        Transform.mulToOutUnsafeVec2(_xfa, _localPointA, _pointA);
-        Transform.mulToOutUnsafeVec2(_xfb, _localPointB, _pointB);
+        _pointA.setFrom(Transform.mulVec2(_xfa, _localPointA));
+        _pointB.setFrom(Transform.mulVec2(_xfb, _localPointB));
 
         double separation = (_pointB..sub(_pointA)).dot(axis);
         return separation;
 
       case SeparationFunctionType.FACE_A:
-        Rot.mulToOutUnsafe(_xfa.q, axis, _normal);
-        Transform.mulToOutUnsafeVec2(_xfa, localPoint, _pointA);
+        _normal.setFrom(Rot.mulVec2(_xfa.q, axis));
+        _pointA.setFrom(Transform.mulVec2(_xfa, localPoint));
 
-        Rot.mulTransUnsafeVec2(_xfb.q, _normal..negate(), _axisB);
+        _axisB.setFrom(Rot.mulTransVec2(_xfb.q, _normal..negate()));
         _normal.negate();
 
         indexes[0] = -1;
         indexes[1] = proxyB.getSupport(_axisB);
 
         _localPointB.setFrom(proxyB.getVertex(indexes[1]));
-        Transform.mulToOutUnsafeVec2(_xfb, _localPointB, _pointB);
+        _pointB.setFrom(Transform.mulVec2(_xfb, _localPointB));
 
         double separation = (_pointB..sub(_pointA)).dot(_normal);
         return separation;
 
       case SeparationFunctionType.FACE_B:
-        Rot.mulToOutUnsafe(_xfb.q, axis, _normal);
-        Transform.mulToOutUnsafeVec2(_xfb, localPoint, _pointB);
+        _normal.setFrom(Rot.mulVec2(_xfb.q, axis));
+        _pointB.setFrom(Transform.mulVec2(_xfb, localPoint));
 
-        Rot.mulTransUnsafeVec2(_xfa.q, _normal..negate(), _axisA);
+        _axisA.setFrom(Rot.mulTransVec2(_xfa.q, _normal..negate()));
         _normal.negate();
 
         indexes[1] = -1;
         indexes[0] = proxyA.getSupport(_axisA);
 
         _localPointA.setFrom(proxyA.getVertex(indexes[0]));
-        Transform.mulToOutUnsafeVec2(_xfa, _localPointA, _pointA);
+        _pointA.setFrom(Transform.mulVec2(_xfa, _localPointA));
 
         double separation = (_pointA..sub(_pointB)).dot(_normal);
         return separation;
@@ -494,27 +428,27 @@ class SeparationFunction {
         _localPointA.setFrom(proxyA.getVertex(indexA));
         _localPointB.setFrom(proxyB.getVertex(indexB));
 
-        Transform.mulToOutUnsafeVec2(_xfa, _localPointA, _pointA);
-        Transform.mulToOutUnsafeVec2(_xfb, _localPointB, _pointB);
+        _pointA.setFrom(Transform.mulVec2(_xfa, _localPointA));
+        _pointB.setFrom(Transform.mulVec2(_xfb, _localPointB));
 
         double separation = (_pointB..sub(_pointA)).dot(axis);
         return separation;
 
       case SeparationFunctionType.FACE_A:
-        Rot.mulToOutUnsafe(_xfa.q, axis, _normal);
-        Transform.mulToOutUnsafeVec2(_xfa, localPoint, _pointA);
+        _normal.setFrom(Rot.mulVec2(_xfa.q, axis));
+        _pointA.setFrom(Transform.mulVec2(_xfa, localPoint));
 
         _localPointB.setFrom(proxyB.getVertex(indexB));
-        Transform.mulToOutUnsafeVec2(_xfb, _localPointB, _pointB);
+        _pointB.setFrom(Transform.mulVec2(_xfb, _localPointB));
         double separation = (_pointB..sub(_pointA)).dot(_normal);
         return separation;
 
       case SeparationFunctionType.FACE_B:
-        Rot.mulToOutUnsafe(_xfb.q, axis, _normal);
-        Transform.mulToOutUnsafeVec2(_xfb, localPoint, _pointB);
+        _normal.setFrom(Rot.mulVec2(_xfb.q, axis));
+        _pointB.setFrom(Transform.mulVec2(_xfb, localPoint));
 
         _localPointA.setFrom(proxyA.getVertex(indexA));
-        Transform.mulToOutUnsafeVec2(_xfa, _localPointA, _pointA);
+        _pointA.setFrom(Transform.mulVec2(_xfa, _localPointA));
 
         double separation = (_pointA..sub(_pointB)).dot(_normal);
         return separation;

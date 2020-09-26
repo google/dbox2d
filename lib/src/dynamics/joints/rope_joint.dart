@@ -1,42 +1,14 @@
-/*******************************************************************************
- * Copyright (c) 2015, Daniel Murphy, Google
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *  * Redistributions of source code must retain the above copyright notice,
- *    this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
- * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- ******************************************************************************/
-
 part of box2d;
 
-/**
- * A rope joint enforces a maximum distance between two points on two bodies. It has no other
- * effect. Warning: if you attempt to change the maximum length during the simulation you will get
- * some non-physical behavior. A model that would allow you to dynamically modify the length would
- * have some sponginess, so I chose not to implement it that way. See DistanceJoint if you want to
- * dynamically control length.
- *
- * @author Daniel Murphy
- */
+/// A rope joint enforces a maximum distance between two points on two bodies. It has no other
+/// effect. Warning: if you attempt to change the maximum length during the simulation you will get
+/// some non-physical behavior. A model that would allow you to dynamically modify the length would
+/// have some sponginess, so I chose not to implement it that way. See DistanceJoint if you want to
+/// dynamically control length.
 class RopeJoint extends Joint {
   // Solver shared
-  final Vector2 _localAnchorA = new Vector2.zero();
-  final Vector2 _localAnchorB = new Vector2.zero();
+  final Vector2 localAnchorA = Vector2.zero();
+  final Vector2 localAnchorB = Vector2.zero();
   double _maxLength = 0.0;
   double _length = 0.0;
   double _impulse = 0.0;
@@ -44,11 +16,11 @@ class RopeJoint extends Joint {
   // Solver temp
   int _indexA = 0;
   int _indexB = 0;
-  final Vector2 _u = new Vector2.zero();
-  final Vector2 _rA = new Vector2.zero();
-  final Vector2 _rB = new Vector2.zero();
-  final Vector2 _localCenterA = new Vector2.zero();
-  final Vector2 _localCenterB = new Vector2.zero();
+  final Vector2 _u = Vector2.zero();
+  final Vector2 _rA = Vector2.zero();
+  final Vector2 _rB = Vector2.zero();
+  final Vector2 _localCenterA = Vector2.zero();
+  final Vector2 _localCenterB = Vector2.zero();
   double _invMassA = 0.0;
   double _invMassB = 0.0;
   double _invIA = 0.0;
@@ -56,9 +28,9 @@ class RopeJoint extends Joint {
   double _mass = 0.0;
   LimitState _state = LimitState.INACTIVE;
 
-  RopeJoint(IWorldPool worldPool, RopeJointDef def) : super(worldPool, def) {
-    _localAnchorA.setFrom(def.localAnchorA);
-    _localAnchorB.setFrom(def.localAnchorB);
+  RopeJoint(RopeJointDef def) : super(def) {
+    localAnchorA.setFrom(def.localAnchorA);
+    localAnchorB.setFrom(def.localAnchorB);
 
     _maxLength = def.maxLength;
   }
@@ -83,26 +55,22 @@ class RopeJoint extends Joint {
     Vector2 vB = data.velocities[_indexB].v;
     double wB = data.velocities[_indexB].w;
 
-    final Rot qA = pool.popRot();
-    final Rot qB = pool.popRot();
-    final Vector2 temp = pool.popVec2();
+    final Rot qA = Rot();
+    final Rot qB = Rot();
+    final Vector2 temp = Vector2.zero();
 
     qA.setAngle(aA);
     qB.setAngle(aB);
 
     // Compute the effective masses.
-    Rot.mulToOutUnsafe(
-        qA,
-        temp
-          ..setFrom(_localAnchorA)
-          ..sub(_localCenterA),
-        _rA);
-    Rot.mulToOutUnsafe(
-        qB,
-        temp
-          ..setFrom(_localAnchorB)
-          ..sub(_localCenterB),
-        _rB);
+    temp
+      ..setFrom(localAnchorA)
+      ..sub(_localCenterA);
+    _rA.setFrom(Rot.mulVec2(qA, temp));
+    temp
+      ..setFrom(localAnchorB)
+      ..sub(_localCenterB);
+    _rB.setFrom(Rot.mulVec2(qB, temp));
 
     _u
       ..setFrom(cB)
@@ -125,8 +93,6 @@ class RopeJoint extends Joint {
       _u.setZero();
       _mass = 0.0;
       _impulse = 0.0;
-      pool.pushRot(2);
-      pool.pushVec2(1);
       return;
     }
 
@@ -155,12 +121,7 @@ class RopeJoint extends Joint {
       _impulse = 0.0;
     }
 
-    pool.pushRot(2);
-    pool.pushVec2(1);
-
-    // data.velocities[_indexA].v = vA;
     data.velocities[_indexA].w = wA;
-    // data.velocities[_indexB].v = vB;
     data.velocities[_indexB].w = wB;
   }
 
@@ -170,10 +131,9 @@ class RopeJoint extends Joint {
     Vector2 vB = data.velocities[_indexB].v;
     double wB = data.velocities[_indexB].w;
 
-    // Cdot = dot(u, v + cross(w, r))
-    Vector2 vpA = pool.popVec2();
-    Vector2 vpB = pool.popVec2();
-    Vector2 temp = pool.popVec2();
+    Vector2 vpA = Vector2.zero();
+    Vector2 vpB = Vector2.zero();
+    Vector2 temp = Vector2.zero();
 
     _rA.scaleOrthogonalInto(wA, vpA);
     vpA.add(vA);
@@ -192,7 +152,7 @@ class RopeJoint extends Joint {
 
     double impulse = -_mass * Cdot;
     double oldImpulse = _impulse;
-    _impulse = Math.min(0.0, _impulse + impulse);
+    _impulse = Math.min<double>(0.0, _impulse + impulse);
     impulse = _impulse - oldImpulse;
 
     double Px = impulse * _u.x;
@@ -203,8 +163,6 @@ class RopeJoint extends Joint {
     vB.x += _invMassB * Px;
     vB.y += _invMassB * Py;
     wB += _invIB * (_rB.x * Py - _rB.y * Px);
-
-    pool.pushVec2(3);
 
     // data.velocities[_indexA].v = vA;
     data.velocities[_indexA].w = wA;
@@ -218,29 +176,26 @@ class RopeJoint extends Joint {
     Vector2 cB = data.positions[_indexB].c;
     double aB = data.positions[_indexB].a;
 
-    final Rot qA = pool.popRot();
-    final Rot qB = pool.popRot();
-    final Vector2 u = pool.popVec2();
-    final Vector2 rA = pool.popVec2();
-    final Vector2 rB = pool.popVec2();
-    final Vector2 temp = pool.popVec2();
+    final Rot qA = Rot();
+    final Rot qB = Rot();
+    final Vector2 u = Vector2.zero();
+    final Vector2 rA = Vector2.zero();
+    final Vector2 rB = Vector2.zero();
+    final Vector2 temp = Vector2.zero();
 
     qA.setAngle(aA);
     qB.setAngle(aB);
 
     // Compute the effective masses.
-    Rot.mulToOutUnsafe(
-        qA,
-        temp
-          ..setFrom(_localAnchorA)
-          ..sub(_localCenterA),
-        rA);
-    Rot.mulToOutUnsafe(
-        qB,
-        temp
-          ..setFrom(_localAnchorB)
-          ..sub(_localCenterB),
-        rB);
+    temp
+      ..setFrom(localAnchorA)
+      ..sub(_localCenterA);
+    rA.setFrom(Rot.mulVec2(qA, temp));
+    temp
+      ..setFrom(localAnchorB)
+      ..sub(_localCenterB);
+    rB.setFrom(Rot.mulVec2(qB, temp));
+
     u
       ..setFrom(cB)
       ..add(rB)
@@ -248,11 +203,11 @@ class RopeJoint extends Joint {
       ..sub(rA);
 
     double length = u.normalize();
-    double C = length - _maxLength;
+    double c = length - _maxLength;
 
-    C = MathUtils.clampDouble(C, 0.0, Settings.maxLinearCorrection);
+    c = MathUtils.clampDouble(c, 0.0, Settings.maxLinearCorrection);
 
-    double impulse = -_mass * C;
+    double impulse = -_mass * c;
     double Px = impulse * u.x;
     double Py = impulse * u.y;
 
@@ -263,42 +218,18 @@ class RopeJoint extends Joint {
     cB.y += _invMassB * Py;
     aB += _invIB * (rB.x * Py - rB.y * Px);
 
-    pool.pushRot(2);
-    pool.pushVec2(4);
-
-    // data.positions[_indexA].c = cA;
     data.positions[_indexA].a = aA;
-    // data.positions[_indexB].c = cB;
     data.positions[_indexB].a = aB;
 
     return length - _maxLength < Settings.linearSlop;
   }
 
-  void getAnchorA(Vector2 argOut) {
-    _bodyA.getWorldPointToOut(_localAnchorA, argOut);
-  }
-
-  void getAnchorB(Vector2 argOut) {
-    _bodyB.getWorldPointToOut(_localAnchorB, argOut);
-  }
-
-  void getReactionForce(double inv_dt, Vector2 argOut) {
-    argOut
-      ..setFrom(_u)
-      ..scale(inv_dt)
-      ..scale(_impulse);
+  Vector2 getReactionForce(double inv_dt) {
+    return Vector2.copy(_u)..scale(inv_dt)..scale(_impulse);
   }
 
   double getReactionTorque(double inv_dt) {
     return 0.0;
-  }
-
-  Vector2 getLocalAnchorA() {
-    return _localAnchorA;
-  }
-
-  Vector2 getLocalAnchorB() {
-    return _localAnchorB;
   }
 
   double getMaxLength() {
